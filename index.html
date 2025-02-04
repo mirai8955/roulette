@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>ルーレットシステム</title>
+  <style>
+    /* 全体レイアウト */
+    html, body {
+      margin: 0;
+      padding: 0;
+      font-family: sans-serif;
+    }
+    .container {
+      width: 800px;
+      min-height: 100vh;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    /* 各ルーレット行のレイアウト */
+    .roulette-row {
+      display: flex;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+    .label {
+      width: 100px;
+      font-weight: bold;
+      margin-right: 20px;
+      font-size: 16px;
+    }
+    canvas {
+      border: 1px solid #ccc;
+      /* 固定サイズ：幅400px × 高さ100px */
+      width: 400px;
+      height: 100px;
+    }
+    /* ボタンのデザイン */
+    .buttons {
+      margin-top: 20px;
+    }
+    button {
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 8px 16px;
+      font-size: 16px;
+      cursor: pointer;
+      margin: 0 10px;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- ルーレット行を動的に生成するためのコンテナ -->
+    <div id="rouletteContainer"></div>
+    <!-- 操作用ボタン -->
+    <div class="buttons">
+      <button id="startButton">Enter</button>
+      <button id="stopButton">Stop</button>
+    </div>
+  </div>
+
+  <script>
+    /*******************************************************
+     * 音声オブジェクトの生成
+     *******************************************************/
+    const bgm = new Audio("roulette/音源/bgm_classic_etc_korobushka.wav");
+    bgm.loop = true;
+    const seItemGet = new Audio("roulette/音源/se_itemget_014.wav");
+    const jingleClear = new Audio("roulette/音源/jingle_original_clear_002.mp3");
+
+    /*******************************************************
+     * 画像セットの定義
+     *******************************************************/
+    const imageSets = {
+      when: [
+        "roulette/いつ/itu1.sabori.jpg",
+        "roulette/いつ/itu2.shingetsu.jpg",
+        "roulette/いつ/itu3.kitakuji.jpg",
+        "roulette/いつ/itu4.mangetsu.jpg",
+        "roulette/いつ/itu5.fuyu.jpg",
+        "roulette/いつ/itu6.kyuujitsu.jpg",
+        "roulette/いつ/itu7.tsuyunoyoru.jpg",
+        "roulette/いつ/itu8.ryuusei.jpg",
+        "roulette/いつ/itu9.shitsuren.jpg",
+        "roulette/いつ/itu10.tomodachi.jpg",
+        "roulette/いつ/itu11.ryokou.jpg",
+        "roulette/いつ/itu12.tsuukin.jpg"
+      ],
+      where: [
+        "roulette/どこで/doko1.meisekimu.jpg",
+        "roulette/どこで/doko2.isekai.jpg",
+        "roulette/どこで/doko3.kyoukai.jpg",
+        "roulette/どこで/doko4.birunookujyou.jpg",
+        "roulette/どこで/doko5.missitsu.jpg",
+        "roulette/どこで/doko6.yuuennchi.jpg",
+        "roulette/どこで/doko7.suizokukan.jpg",
+        "roulette/どこで/doko8.byouin.jpg",
+        "roulette/どこで/doko9.power.jpg",
+        "roulette/どこで/doko10,umi.jpg",
+        "roulette/どこで/doko11.gakkou.jpg",
+        "roulette/どこで/doko12.eki.jpg",
+        "roulette/どこで/doko13.kousaten.jpg"
+      ],
+      with: [
+        "roulette/誰/dare1.meido.jpg",
+        "roulette/誰/dare2.siri.jpg",
+        "roulette/誰/dare3.syatiku.jpg",
+        "roulette/誰/dare4.nito.jpg",
+        "roulette/誰/dare5.asasin.jpg",
+        "roulette/誰/dare6.kyousi.jpg",
+        "roulette/誰/dare7.jk.jpg",
+        "roulette/誰/dare8.kami.jpg",
+        "roulette/誰/dare9.oosaka.jpg",
+        "roulette/誰/dare10.ishi.jpg",
+        "roulette/誰/dare11.dk.jpg",
+        "roulette/誰/dare12.tantei.jpg"
+      ],
+      who: [
+        "roulette/誰/dare13.tenshi.jpg",
+        "roulette/誰/dare14,motogunnjin.jpg",
+        "roulette/誰/dare15.geinoujin.jpg",
+        "roulette/誰/dare16.akuma.jpg",
+        "roulette/誰/dare17.dc.jpg",
+        "roulette/誰/dare18.sitsuji.jpg",
+        "roulette/誰/dare19.tresure.jpg",
+        "roulette/誰/dare20.barikyari.jpg",
+        "roulette/誰/dare21.dorobou.jpg",
+        "roulette/誰/dare22.rsychopass.jpg",
+        "roulette/誰/dare23.jc.jpg",
+        "roulette/誰/dare24.magi.jpg"
+      ],
+      sleepy: [
+        "roulette/何を/nani1.debyu.jpg",
+        "roulette/何を/nani2.kaiketsu.jpg",
+        "roulette/何を/nani3.koroshiai.jpg",
+        "roulette/何を/nani4.koi.jpg",
+        "roulette/何を/nani5.battle.jpg",
+        "roulette/何を/nani6.isekaimayou.jpg",
+        "roulette/何を/nani7.gekokujyou.jpg",
+        "roulette/何を/nani8.kyoutou.jpg",
+        "roulette/何を/nani9.takara.jpg",
+        "roulette/何を/nani10.dassyutsu.jpg",
+        "roulette/何を/nani11.makikomare.jpg",
+        "roulette/何を/nani12.timeleap.jpg",
+        "roulette/何を/nani13.saikai.jpg"
+      ]
+    };
+
+    // 各ルーレットのカテゴリ情報（表示順・ラベル・対応する imageSets のキー）
+    const categories = [
+      { label: "いつ", key: "when" },
+      { label: "どこで", key: "where" },
+      { label: "誰と", key: "with" },
+      { label: "誰が", key: "who" },
+      { label: "何した", key: "sleepy" } // 表示ラベルは「何した」、画像は「何を」フォルダのものを使用
+    ];
+
+    /*******************************************************
+     * ルーレットシステムの初期化
+     *******************************************************/
+    const roulettes = [];
+    const rouletteContainer = document.getElementById("rouletteContainer");
+
+    // 各カテゴリごとにルーレット行（ラベル＋Canvas）を生成
+    categories.forEach((cat, index) => {
+      // ルーレット行の div 要素を作成
+      const rowDiv = document.createElement("div");
+      rowDiv.classList.add("roulette-row");
+
+      // ラベル要素の作成
+      const labelDiv = document.createElement("div");
+      labelDiv.classList.add("label");
+      labelDiv.textContent = cat.label;
+      rowDiv.appendChild(labelDiv);
+
+      // Canvas 要素の作成
+      const canvas = document.createElement("canvas");
+      canvas.width = 400;
+      canvas.height = 100;
+      canvas.id = "canvas-" + index;
+      rowDiv.appendChild(canvas);
+
+      // ルーレットオブジェクトの生成
+      const roulette = {
+        canvas: canvas,
+        ctx: canvas.getContext("2d"),
+        label: cat.label,
+        images: [],
+        currentIndex: 0,
+        offset: 0,       // -1 ～ 0 の範囲（offset = 0 で画像がぴったり表示）
+        speed: 0,        // 通常回転時は -0.03
+        isSpinning: false,
+        isStopping: false,
+        loaded: false
+      };
+
+      roulettes.push(roulette);
+      rouletteContainer.appendChild(rowDiv);
+      // 指定の画像セットから画像群を読み込み
+      loadImagesForRoulette(roulette, imageSets[cat.key]);
+    });
+
+    // 画像を非同期で読み込む関数
+    function loadImagesForRoulette(roulette, imagesArray) {
+      let loadedCount = 0;
+      const totalCount = imagesArray.length;
+      imagesArray.forEach(src => {
+        const img = new Image();
+        img.src = src;
+        img.onload = () => {
+          loadedCount++;
+          if (loadedCount === totalCount) {
+            roulette.loaded = true;
+            drawRoulette(roulette);
+          }
+        };
+        img.onerror = () => {
+          console.error("画像の読み込みに失敗しました: " + src);
+          loadedCount++;
+          if (loadedCount === totalCount) {
+            roulette.loaded = true;
+            drawRoulette(roulette);
+          }
+        };
+        roulette.images.push(img);
+      });
+    }
+
+    /*******************************************************
+     * アニメーション制御（60FPS）
+     *******************************************************/
+    function animate() {
+      requestAnimationFrame(animate);
+      roulettes.forEach(roulette => {
+        if (roulette.loaded) {
+          updateRoulette(roulette);
+          drawRoulette(roulette);
+        }
+      });
+    }
+
+    // ルーレットの状態更新
+    // ・通常回転時は一定速度で更新
+    // ・停止処理中はまず減速し、速度が十分小さくなったら「スナップ」処理でぴったり合わせます
+    function updateRoulette(roulette) {
+      if (!roulette.isSpinning) return;
+
+      if (roulette.isStopping) {
+        // 減速フェーズ：速度に 0.98 を乗算
+        roulette.speed *= 0.98;
+        if (Math.abs(roulette.speed) < 0.001) {
+          // 速度が極小になったらスナップ処理へ移行
+          // 現在の offset に対し、上の画像が見えているなら target = 0、下に流れているなら target = -1 とします
+          const target = (roulette.offset > -0.5) ? 0 : -1;
+          roulette.offset += (target - roulette.offset) * 0.2;
+          if (Math.abs(roulette.offset - target) < 0.001) {
+            roulette.offset = target;
+            if (target === -1) {
+              // target = -1 なら次の画像に切り替え
+              roulette.currentIndex = (roulette.currentIndex + 1) % roulette.images.length;
+              roulette.offset = 0;
+            }
+            roulette.speed = 0;
+            roulette.isSpinning = false;
+            roulette.isStopping = false;
+            // 停止音の再生：もし全ルーレットが停止状態なら jingle を、そうでなければ se_itemget を鳴らす
+            if (roulettes.every(r => !r.isSpinning)) {
+              bgm.pause();
+              jingleClear.currentTime = 0;
+              jingleClear.play();
+            } else {
+              seItemGet.currentTime = 0;
+              seItemGet.play();
+            }
+            return;
+          }
+          return;
+        }
+        // 減速中の通常更新
+        roulette.offset += roulette.speed;
+        if (roulette.offset <= -1) {
+          roulette.offset += 1;
+          roulette.currentIndex = (roulette.currentIndex + 1) % roulette.images.length;
+        }
+      } else {
+        // 通常回転：一定速度 -0.03 で更新
+        roulette.speed = -0.20;
+        roulette.offset += roulette.speed;
+        if (roulette.offset <= -1) {
+          roulette.offset += 1;
+          roulette.currentIndex = (roulette.currentIndex + 1) % roulette.images.length;
+        }
+      }
+    }
+
+    // Canvas に現在の画像と次の画像（2枚）を描画
+    function drawRoulette(roulette) {
+      const ctx = roulette.ctx;
+      const canvas = roulette.canvas;
+      const h = canvas.height;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // 現在の画像の描画位置
+      const yCurrent = -roulette.offset * h;
+      // 次の画像はその上部に配置（yCurrent - h）
+      const yNext = yCurrent - h;
+      const currentImg = roulette.images[roulette.currentIndex];
+      const nextIndex = (roulette.currentIndex + 1) % roulette.images.length;
+      const nextImg = roulette.images[nextIndex];
+
+      ctx.drawImage(currentImg, 0, yCurrent, canvas.width, h);
+      ctx.drawImage(nextImg, 0, yNext, canvas.width, h);
+    }
+
+    /*******************************************************
+     * 操作機能
+     *******************************************************/
+    // Enter が押されると、すべてのルーレットを再始動（回転）します
+    function startAllRoulettes() {
+      // BGM の再生（再始動時は先頭から再生）
+      bgm.currentTime = 0;
+      bgm.play();
+      roulettes.forEach(roulette => {
+        roulette.isSpinning = true;
+        roulette.isStopping = false;
+        roulette.speed = -0.03;
+        roulette.offset = 0;
+        // 任意：開始時にランダムな画像インデックスに設定
+        roulette.currentIndex = Math.floor(Math.random() * roulette.images.length);
+      });
+    }
+
+    // Stop ボタンを押すと、回転中のルーレットのうち、一番上（リスト順）のルーレットを停止対象とします
+    function stopNextRoulette() {
+      for (let i = 0; i < roulettes.length; i++) {
+        if (roulettes[i].isSpinning && !roulettes[i].isStopping) {
+          roulettes[i].isStopping = true;
+          break;  // １台のみ停止
+        }
+      }
+    }
+
+    // キー入力（Enter キー）で再始動
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        startAllRoulettes();
+      }
+    });
+    document.getElementById("startButton").addEventListener("click", startAllRoulettes);
+    document.getElementById("stopButton").addEventListener("click", stopNextRoulette);
+
+    // アニメーション開始
+    animate();
+  </script>
+</body>
+</html>
