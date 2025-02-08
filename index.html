@@ -2,51 +2,44 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>ルーレットシステム</title>
+  <title>ルーレットシステム with Wallpaper</title>
   <style>
-    /* 全体レイアウト */
+    /* ページ全体の基本設定 */
     html, body {
       margin: 0;
       padding: 0;
       font-family: sans-serif;
-      background: linear-gradient(
-        to bottom,
-        #2c5530 75%, /* 黒板をイメージした深緑色 */
-        white 75%    /* 下部1/4を白色に */
-      );
-      min-height: 100vh;
-    }
-    .container {
-      width: 800px;
-      min-height: 100vh;
-      margin: 0 auto;
+      background: #000;
+      /* ページ全体を中央揃え */
       display: flex;
-      flex-direction: column;
-      align-items: center;
       justify-content: center;
-    }
-    /* 各ルーレット行のレイアウト */
-    .roulette-row {
-      display: flex;
       align-items: center;
-      margin-bottom: 15px;
+      height: 100vh;
     }
-    .label {
-      width: 100px;
-      font-weight: bold;
-      margin-right: 20px;
-      font-size: 16px;
-      color: white; /* ラベルを白色に */
+    /* 壁紙コンテナ（9:16 比率） */
+    .background {
+      position: relative;
+      width: 360px;      /* 必要に応じて調整 */
+      height: 640px;     /* 9:16 の比率 */
+      background: url("roulette/イメージ.jpg") center center no-repeat;
+      background-size: cover;
     }
-    canvas {
-      border: 1px solid #ccc;
-      /* 固定サイズ：幅400px × 高さ100px */
-      width: 400px;
-      height: 100px;
+    /* 各ルーレットのキャンバス（絶対配置） */
+    .roulette-canvas {
+      position: absolute;
+      /* 枠の表示確認用。実際は不要な場合は削除してください */
+      /* border: 1px solid red; */
     }
-    /* ボタンのデザイン */
+    /* 例：キャンバスの配置（壁紙上のルーレット枠に合わせる） */
+    #roulette-0 { top: 73px; left: 70px; width: 220px; height: 50px; }
+    #roulette-1 { top: 163px; left: 70px; width: 220px; height: 50px; }
+    #roulette-2 { top: 256px; left: 70px; width: 220px; height: 50px; }
+    #roulette-3 { top: 348px; left: 70px; width: 220px; height: 50px; }
+    #roulette-4 { top: 439px; left: 70px; width: 220px; height: 50px; }
+    /* 操作用ボタンのスタイル */
     .buttons {
       margin-top: 20px;
+      text-align: center;
     }
     button {
       background-color: #4CAF50;
@@ -64,9 +57,16 @@
   </style>
 </head>
 <body>
-  <div class="container">
-    <!-- ルーレット行を動的に生成するためのコンテナ -->
-    <div id="rouletteContainer"></div>
+  <!-- 壁紙コンテナ -->
+  <div>
+    <div class="background">
+      <!-- 各ルーレット用のキャンバス（ID名は 0～4） -->
+      <canvas id="roulette-0" class="roulette-canvas" width="300" height="50"></canvas>
+      <canvas id="roulette-1" class="roulette-canvas" width="300" height="50"></canvas>
+      <canvas id="roulette-2" class="roulette-canvas" width="300" height="50"></canvas>
+      <canvas id="roulette-3" class="roulette-canvas" width="300" height="50"></canvas>
+      <canvas id="roulette-4" class="roulette-canvas" width="300" height="50"></canvas>
+    </div>
     <!-- 操作用ボタン -->
     <div class="buttons">
       <button id="startButton">Enter</button>
@@ -82,6 +82,15 @@
     bgm.loop = true;
     const seItemGet = new Audio("roulette/音源/se_itemget_014.wav");
     const jingleClear = new Audio("roulette/音源/jingle_original_clear_002.mp3");
+    
+    // グローバルフラグ：最後のジングル再生済みかどうか
+    let jinglePlayed = false;
+    
+    // 再生用ヘルパー関数：再生するたびにクローンを生成して再生
+    function playSound(sound) {
+      const clone = sound.cloneNode();
+      clone.play();
+    }
 
     /*******************************************************
      * 画像セットの定義
@@ -162,40 +171,22 @@
     };
 
     // 各ルーレットのカテゴリ情報（表示順・ラベル・対応する imageSets のキー）
+    // ※ 背景の壁紙に既にラベルがある場合は、ここでのテキスト表示は不要ですが、内部処理用に保持します。
     const categories = [
       { label: "いつ", key: "when" },
       { label: "どこで", key: "where" },
       { label: "誰と", key: "with" },
       { label: "誰が", key: "who" },
-      { label: "何した", key: "sleepy" } // 表示ラベルは「何した」、画像は「何を」フォルダのものを使用
+      { label: "何した", key: "sleepy" }
     ];
 
     /*******************************************************
      * ルーレットシステムの初期化
      *******************************************************/
     const roulettes = [];
-    const rouletteContainer = document.getElementById("rouletteContainer");
-
-    // 各カテゴリごとにルーレット行（ラベル＋Canvas）を生成
+    // すでに HTML 内に配置された各キャンバス（ID: roulette-0～roulette-4）を利用
     categories.forEach((cat, index) => {
-      // ルーレット行の div 要素を作成
-      const rowDiv = document.createElement("div");
-      rowDiv.classList.add("roulette-row");
-
-      // ラベル要素の作成
-      const labelDiv = document.createElement("div");
-      labelDiv.classList.add("label");
-      labelDiv.textContent = cat.label;
-      rowDiv.appendChild(labelDiv);
-
-      // Canvas 要素の作成
-      const canvas = document.createElement("canvas");
-      canvas.width = 400;
-      canvas.height = 100;
-      canvas.id = "canvas-" + index;
-      rowDiv.appendChild(canvas);
-
-      // ルーレットオブジェクトの生成
+      const canvas = document.getElementById("roulette-" + index);
       const roulette = {
         canvas: canvas,
         ctx: canvas.getContext("2d"),
@@ -203,14 +194,12 @@
         images: [],
         currentIndex: 0,
         offset: 0,       // -1 ～ 0 の範囲（offset = 0 で画像がぴったり表示）
-        speed: 0,        // 通常回転時は -0.03
+        speed: 0,        // 通常回転時は -0.03～-0.20（用途に合わせて調整）
         isSpinning: false,
         isStopping: false,
         loaded: false
       };
-
       roulettes.push(roulette);
-      rouletteContainer.appendChild(rowDiv);
       // 指定の画像セットから画像群を読み込み
       loadImagesForRoulette(roulette, imageSets[cat.key]);
     });
@@ -265,40 +254,42 @@
         roulette.speed *= 0.98;
         if (Math.abs(roulette.speed) < 0.001) {
           // 速度が極小になったらスナップ処理へ移行
-          // 現在の offset に対し、上の画像が見えているなら target = 0、下に流れているなら target = -1 とします
           const target = (roulette.offset > -0.5) ? 0 : -1;
           roulette.offset += (target - roulette.offset) * 0.2;
           if (Math.abs(roulette.offset - target) < 0.001) {
             roulette.offset = target;
             if (target === -1) {
-              // target = -1 なら次の画像に切り替え
+              // 次の画像へ切替
               roulette.currentIndex = (roulette.currentIndex + 1) % roulette.images.length;
               roulette.offset = 0;
             }
             roulette.speed = 0;
             roulette.isSpinning = false;
             roulette.isStopping = false;
-            // 停止音の再生：もし全ルーレットが停止状態なら jingle を、そうでなければ se_itemget を鳴らす
+            // 停止音の再生処理
             if (roulettes.every(r => !r.isSpinning)) {
               bgm.pause();
-              jingleClear.currentTime = 0;
-              jingleClear.play();
+              // 最後のルーレット停止時はジングルを1回だけ再生する
+              if (!jinglePlayed) {
+                jingleClear.currentTime = 0;
+                playSound(jingleClear);
+                jinglePlayed = true;
+              }
             } else {
-              seItemGet.currentTime = 0;
-              seItemGet.play();
+              playSound(seItemGet);
             }
             return;
           }
           return;
         }
-        // 減速中の通常更新
+        // 通常更新中
         roulette.offset += roulette.speed;
         if (roulette.offset <= -1) {
           roulette.offset += 1;
           roulette.currentIndex = (roulette.currentIndex + 1) % roulette.images.length;
         }
       } else {
-        // 通常回転：一定速度 -0.03 で更新
+        // 通常回転時：ここでは -0.20 を例に（必要に応じて調整）
         roulette.speed = -0.20;
         roulette.offset += roulette.speed;
         if (roulette.offset <= -1) {
@@ -315,9 +306,7 @@
       const h = canvas.height;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // 現在の画像の描画位置
       const yCurrent = -roulette.offset * h;
-      // 次の画像はその上部に配置（yCurrent - h）
       const yNext = yCurrent - h;
       const currentImg = roulette.images[roulette.currentIndex];
       const nextIndex = (roulette.currentIndex + 1) % roulette.images.length;
@@ -330,9 +319,10 @@
     /*******************************************************
      * 操作機能
      *******************************************************/
-    // Enter が押されると、すべてのルーレットを再始動（回転）します
+    // Enter キー（または Enter ボタン）で全ルーレットを再始動（回転）し、BGM を再生
     function startAllRoulettes() {
-      // BGM の再生（再始動時は先頭から再生）
+      // 再始動時はジングルフラグをリセット
+      jinglePlayed = false;
       bgm.currentTime = 0;
       bgm.play();
       roulettes.forEach(roulette => {
@@ -340,17 +330,16 @@
         roulette.isStopping = false;
         roulette.speed = -0.03;
         roulette.offset = 0;
-        // 任意：開始時にランダムな画像インデックスに設定
         roulette.currentIndex = Math.floor(Math.random() * roulette.images.length);
       });
     }
 
-    // Stop ボタンを押すと、回転中のルーレットのうち、一番上（リスト順）のルーレットを停止対象とします
+    // Stop ボタンを押すと、回転中のルーレットのうち、一番上（リスト順）のルーレットのみ停止
     function stopNextRoulette() {
       for (let i = 0; i < roulettes.length; i++) {
         if (roulettes[i].isSpinning && !roulettes[i].isStopping) {
           roulettes[i].isStopping = true;
-          break;  // １台のみ停止
+          break;  // 1台のみ停止
         }
       }
     }
